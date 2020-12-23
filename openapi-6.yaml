@@ -113,7 +113,13 @@ paths:
                 $ref: '#/components/schemas/ExecuteRequest'
             examples:
               test1:
-                value: "test1_val"
+                value:
+                  Target: string
+                  AutomationCommands:
+                  - Command: PRESS 1; PRESS 2; PRESS OK;
+                    Version: string
+                    TimeoutMilliseconds: 0
+                    ResponseAwaitBehaviour: OnAfterCommand
               test2:
                 value: "test2_val"
         required: true
