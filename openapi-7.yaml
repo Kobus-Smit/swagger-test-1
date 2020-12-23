@@ -114,9 +114,10 @@ paths:
             examples:
               test1:
                 value:
-                  Target: string
+                - Target: string
                   AutomationCommands:
-                  - Command: PRESS 1; PRESS 2; PRESS OK;
+                  - Command:
+                      ValueKind: Undefined
                     Version: string
                     TimeoutMilliseconds: 0
                     ResponseAwaitBehaviour: OnAfterCommand
