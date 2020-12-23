@@ -220,6 +220,11 @@ components:
       required:
         - Target
         - AutomationCommands
+      discriminator:
+        propertyName: Target
+        mapping:
+          robot_simple: '#/components/schemas/ExampleRobotSimpleRequest'
+          robot_multiple: '#/components/schemas/ExampleRobotSimpleRequest'
       properties:
         Target:
           type: string
