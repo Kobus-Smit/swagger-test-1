@@ -214,6 +214,20 @@ components:
         - 'True'
         - 'False'
         - 'Null'
+    Dog:
+      description: A representation of a dog
+      allOf:
+        - $ref: '#/components/schemas/ExecuteRequest'
+        - type: object
+          properties:
+            packSize:
+              type: integer
+              format: int32
+              description: The size of the pack the dog is from
+              default: 1
+              minimum: 1
+          required:
+            - packSize
     HoneyBee:
       description: A representation of a honey bee
       allOf:
@@ -237,7 +251,7 @@ components:
         propertyName: Target
         mapping:
           robot_simple: '#/components/schemas/HoneyBee'
-          robot_multiple: '#/components/schemas/HoneyBee'
+          robot_multiple: '#/components/schemas/Dog'
       properties:
         Target:
           type: string
