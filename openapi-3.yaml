@@ -214,6 +214,19 @@ components:
         - 'True'
         - 'False'
         - 'Null'
+    HoneyBee:
+      description: A representation of a honey bee
+      allOf:
+        - $ref: '#/components/schemas/ExecuteRequest'
+        - type: object
+          properties:
+            honeyPerDay:
+              type: number
+              description: Average amount of honey produced per day in ounces
+              example: 3.14
+              multipleOf: .01
+          required:
+            - honeyPerDay
     ExecuteRequest:
       type: object
       additionalProperties: false
@@ -223,8 +236,8 @@ components:
       discriminator:
         propertyName: Target
         mapping:
-          robot_simple: '#/components/schemas/ExampleRobotSimpleRequest'
-          robot_multiple: '#/components/schemas/ExampleRobotSimpleRequest'
+          robot_simple: '#/components/schemas/HoneyBee'
+          robot_multiple: '#/components/schemas/HoneyBee'
       properties:
         Target:
           type: string
