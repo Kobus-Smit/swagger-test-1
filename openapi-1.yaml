@@ -1,0 +1,485 @@
+x-generator: NSwag v13.9.4.0 (NJsonSchema v10.3.1.0 (Newtonsoft.Json v12.0.0.0))
+openapi: 3.0.0
+info:
+  title: Abrantix Extension API
+  description: "\r\n* Abrantix Extensions REST API is a flexible and extensible REST API that allows its users to integrate\r\nwith Abrantix test tools to run their test(s) or test suits.\r\n* The Extensions REST API provides extensibility through so-called extensions. \r\n* Abrantix provides extensions for Abrantix Test Tools off-the-shelve, or clients can write their own extensions as needed.\r\n* Such extensions could for example parse and validate terminal log files, or integrate with a host\r\nsimulator to validate transaction results.\r\n* The Extension REST API then servers as a single API for all extensions.\r\n* The extensions provided by Abrantix or newly created by clients can be easily added or removed\r\nthrough the configuration of Extensions REST API.\r\n\r\n# Introduction\r\nThis API is documented in **OpenAPI format** and so on and so on...\r\n\r\n# Another Heading\r\nCan add more *Markdown* here.\r\n- Item 1\r\n- Item 2"
+  contact:
+    name: Abrantix Ltd
+    url: 'https://www.abrantix.com'
+    email: martin.gloor@abrantix.com
+  license:
+    name: License
+    url: 'https://www.abrantix.com/license'
+  version: v2
+  x-logo:
+    url: 'https://www.abrantix.com/files/img/abrantix-logo-blau.svg'
+    altText: Logo
+    href: 'https://www.abrantix.com'
+servers:
+  - url: 'http://localhost:8000'
+paths:
+  /ExtensionApi/V2:
+    get:
+      tags:
+        - ExtensionApiV2
+      summary: Get extensions IDs
+      operationId: ExtensionApiV2_Get
+      responses:
+        '200':
+          description: '`StatusResponse` containing IDs of the active extensions'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatusResponse'
+  /ExtensionApi/V2/TestInitialize:
+    post:
+      tags:
+        - ExtensionApiV2
+      summary: Initializes test environment
+      description: |-
+        * Intended to be called at the beginning of a test case.
+        * Extensions who support this will run initialization tasks here.
+        * For example, the OCR extension can be configured to start taking pictures here
+
+        Only use this method if you want to control the test lifetime in conjunction with `ExecuteSteps` and `TestCleanup`. Otherwise use `ExecuteTest`
+      operationId: ExtensionApiV2_TestInitialize
+      responses:
+        '200':
+          description: ''
+  /ExtensionApi/V2/ExecuteSteps:
+    post:
+      tags:
+        - ExtensionApiV2
+      summary: Executes test steps
+      description: |-
+        * Called to send commands to extensions, therefore to perform individual test steps, on an initialized test environment.
+         
+        Only use this method if you want to control the test lifetime in conjunction with `TestInitialize` and `TestCleanup`. Otherwise use `ExecuteTest`
+
+         
+      operationId: ExtensionApiV2_ExecuteSteps
+      requestBody:
+        x-name: executeRequests
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/ExecuteRequest'
+        required: true
+        x-position: 1
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExecuteResponse'
+  /ExtensionApi/V2/TestCleanup:
+    post:
+      tags:
+        - ExtensionApiV2
+      summary: |-
+        Clean up test environment
+         
+      description: |-
+        * Intended to be called at the end of a test case.
+        * Extensions who support this will cleanup here.
+        * For example, the OCR extension can be configured to stop taking pictures here, or the robot extension can be configured to turn the robot motors off here.
+
+        Only use this method if you want to control the test lifetime in conjunction with `TestInitialize` and `ExecuteSteps`. Otherwise use `ExecuteTest`
+      operationId: ExtensionApiV2_TestCleanup
+      responses:
+        '200':
+          description: ''
+  /ExtensionApi/V2/ExecuteTest:
+    post:
+      tags:
+        - ExtensionApiV2
+      summary: Execute test
+      description: |-
+        * This will run through all execution phases mentioned above and can therefore be used to implement a whole test case.
+        * For the sake of simplicity, this method could also be used to just send single commands to extensions in cases where users do not want to take care of the above mentioned phases within their test scripts
+
+        This method handles the test lifetime for you, if you want more control use `TestInitialize`, `ExecuteSteps`, `TestCleanup` instead
+      operationId: ExtensionApiV2_ExecuteTest
+      requestBody:
+        x-name: executeRequests
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/ExecuteRequest'
+        required: true
+        x-position: 1
+      responses:
+        '200':
+          description: ''
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExecuteResponse'
+components:
+  schemas:
+    StatusResponse:
+      type: object
+      description: IDs of the active extensions
+      example:
+        id:
+          - Robot-1
+          - Mux-1
+          - CtlMux-1
+      additionalProperties: false
+      properties:
+        Id:
+          type: array
+          description: IDs of the active extensions
+          nullable: true
+          items:
+            type: string
+    ExecuteResponse:
+      type: object
+      additionalProperties: false
+      properties:
+        Result:
+          nullable: true
+          oneOf:
+            - $ref: '#/components/schemas/TestResult'
+        AutomationResults:
+          type: array
+          nullable: true
+          items:
+            $ref: '#/components/schemas/AutomationResult'
+    TestResult:
+      allOf:
+        - $ref: '#/components/schemas/Enumeration'
+        - type: object
+          additionalProperties: false
+    Enumeration:
+      type: object
+      x-abstract: true
+      additionalProperties: false
+      properties:
+        Name:
+          type: string
+          nullable: true
+        Code:
+          type: integer
+          format: int32
+    AutomationResult:
+      type: object
+      additionalProperties: false
+      properties:
+        TestResult:
+          nullable: true
+          oneOf:
+            - $ref: '#/components/schemas/TestResult'
+        Command:
+          $ref: '#/components/schemas/JsonElement'
+        Target:
+          type: string
+          nullable: true
+        Payload:
+          $ref: '#/components/schemas/JsonElement'
+        SubAutomationResults:
+          type: array
+          nullable: true
+          items:
+            $ref: '#/components/schemas/AutomationResult'
+    JsonElement:
+      type: object
+      additionalProperties: false
+      properties:
+        ValueKind:
+          $ref: '#/components/schemas/JsonValueKind'
+    JsonValueKind:
+      type: string
+      description: ''
+      x-enumNames:
+        - Undefined
+        - Object
+        - Array
+        - String
+        - Number
+        - 'True'
+        - 'False'
+        - 'Null'
+      enum:
+        - Undefined
+        - Object
+        - Array
+        - String
+        - Number
+        - 'True'
+        - 'False'
+        - 'Null'
+    ExecuteRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - Target
+        - AutomationCommands
+      properties:
+        Target:
+          type: string
+          description: Automation target of the following automationCommands
+          minLength: 1
+        AutomationCommands:
+          type: array
+          items:
+            $ref: '#/components/schemas/AutomationCommand'
+    AutomationCommand:
+      type: object
+      additionalProperties: false
+      required:
+        - Command
+      properties:
+        Command:
+          description: Command for this automation target. For command syntax check documentation of the used extension.
+          oneOf:
+            - $ref: '#/components/schemas/JsonElement'
+        Version:
+          type: string
+          description: version of the command.
+          nullable: true
+        TimeoutMilliseconds:
+          type: integer
+          description: 'Optional: provide a timeout in milliseconds for the command to abort.'
+          format: int32
+          nullable: true
+        ResponseAwaitBehaviour:
+          description: Response Await behaviour per command
+          oneOf:
+            - $ref: '#/components/schemas/ResponseAwaitBehaviour'
+    ResponseAwaitBehaviour:
+      type: string
+      description: ''
+      x-enumNames:
+        - OnAfterCommand
+        - OnRequestEnd
+      enum:
+        - OnAfterCommand
+        - OnRequestEnd
+    ExampleRobotSimpleRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - Target
+        - AutomationCommands
+      properties:
+        Target:
+          type: string
+          description: Automation target of the following automationCommands
+          minLength: 1
+          example: Robot-1
+        AutomationCommands:
+          type: array
+          items:
+            $ref: '#/components/schemas/ExampleRobotSimpleRequestAutomationCommand'
+    ExampleRobotSimpleRequestAutomationCommand:
+      type: object
+      additionalProperties: false
+      required:
+        - Command
+      properties:
+        Command:
+          description: Command for this automation target. For command syntax check documentation of the used extension.
+          example: PRESS 1; PRESS 2; PRESS OK;
+          oneOf:
+            - $ref: '#/components/schemas/JsonElement'
+        Version:
+          type: string
+          description: version of the command.
+          nullable: true
+          example: 1
+        TimeoutMilliseconds:
+          type: integer
+          description: 'Optional: provide a timeout in milliseconds for the command to abort.'
+          format: int32
+          nullable: true
+          example: 1000
+        ResponseAwaitBehaviour:
+          description: Response Await behaviour per command
+          example: OnAfterCommand
+          oneOf:
+            - $ref: '#/components/schemas/ResponseAwaitBehaviour'
+    MswTracerExtension:
+      type: object
+      additionalProperties: false
+      properties:
+        Id:
+          type: string
+          nullable: true
+    MswTracerConfiguration:
+      allOf:
+        - $ref: '#/components/schemas/Configuration'
+        - type: object
+          additionalProperties: false
+          properties:
+            Port:
+              type: integer
+              format: int32
+    Configuration:
+      type: object
+      additionalProperties: false
+      properties:
+        Version:
+          type: string
+          nullable: true
+        Payload:
+          type: string
+          nullable: true
+    MSWTraceMessage:
+      type: object
+      additionalProperties: false
+      properties:
+        TraceLevel:
+          $ref: '#/components/schemas/TraceLevel'
+        DataType:
+          $ref: '#/components/schemas/TraceDataType'
+        MultipartMessage:
+          $ref: '#/components/schemas/MultipartMessage'
+        MultipartMessageId:
+          type: integer
+          format: byte
+        ClassString:
+          type: string
+          nullable: true
+        Data:
+          type: array
+          nullable: true
+          items:
+            type: integer
+            format: byte
+    TraceLevel:
+      type: string
+      description: ''
+      x-enumNames:
+        - Message
+        - Check
+        - Warning
+        - Error
+        - Fatal
+      enum:
+        - Message
+        - Check
+        - Warning
+        - Error
+        - Fatal
+    TraceDataType:
+      type: string
+      description: ''
+      x-enumNames:
+        - Default
+        - Freetext
+        - Xml
+        - HexBinary
+        - HexDer
+        - All
+      enum:
+        - Default
+        - Freetext
+        - Xml
+        - HexBinary
+        - HexDer
+        - All
+    MultipartMessage:
+      type: string
+      description: ''
+      x-enumNames:
+        - None
+        - Multipart
+        - MultipartLast
+      enum:
+        - None
+        - Multipart
+        - MultipartLast
+    MswTraceHost:
+      type: object
+      additionalProperties: false
+    MswTraceCommand:
+      type: object
+      additionalProperties: false
+      properties:
+        Class:
+          type: string
+          nullable: true
+        Action:
+          type: string
+          nullable: true
+        ClassOperator:
+          type: string
+          nullable: true
+        DataType:
+          type: string
+          nullable: true
+        MatchOperator:
+          type: string
+          nullable: true
+        MatchString:
+          type: string
+          nullable: true
+        NoMatchAction:
+          type: string
+          nullable: true
+        Matches:
+          type: array
+          nullable: true
+          items:
+            $ref: '#/components/schemas/Match'
+        ResultExtracts:
+          type: array
+          nullable: true
+          items:
+            $ref: '#/components/schemas/Extract'
+        Timeout:
+          type: integer
+          format: int32
+    Match:
+      type: object
+      additionalProperties: false
+      properties:
+        Select:
+          type: string
+          nullable: true
+        Action:
+          type: string
+          nullable: true
+        Nomatchaction:
+          type: string
+          nullable: true
+    Extract:
+      type: object
+      additionalProperties: false
+      properties:
+        Select:
+          type: string
+          nullable: true
+        Variable:
+          type: string
+          nullable: true
+        RegexResult:
+          type: string
+          nullable: true
+tags:
+  - name: ExtensionApiV2
+    description: 'TODO: ExtensionApi''s description'
+  - name: ExampleRobotSimpleRequest
+    description: '<SchemaDefinition schemaRef="#/components/schemas/ExampleRobotSimpleRequest" />'
+  - name: ExampleRobotSimpleRequestAutomationCommand
+    description: '<SchemaDefinition schemaRef="#/components/schemas/ExampleRobotSimpleRequestAutomationCommand" />'
+  - name: MswTraceCommand
+    description: '<SchemaDefinition schemaRef="#/components/schemas/MswTraceCommand" />'
+  - name: TraceLevel
+    description: '<SchemaDefinition schemaRef="#/components/schemas/TraceLevel" />'
+x-tagGroups:
+  - name: Main API
+    tags:
+      - ExtensionApiV2
+  - name: Models
+    tags:
+      - MswTraceCommand
+      - TraceLevel
+      - ExampleRobotSimpleRequest
+      - ExampleRobotSimpleRequestAutomationCommand
