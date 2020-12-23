@@ -112,26 +112,58 @@ paths:
               items:
                 $ref: '#/components/schemas/ExecuteRequest'
             examples:
-              test1:
-                value:
-                - Target: Robot-1
-                  AutomationCommands:
-                  - Command: PRESS 1; PRESS 2; PRESS OK;
-                    Version: 1
-                    TimeoutMilliseconds: 1000
-                    ResponseAwaitBehaviour: OnAfterCommand
-              test2:
+              robot-single-command:
                 value:
                 - Target: Robot-1
                   AutomationCommands:
                   - Command: PRESS 1
-                    Version: 1.1
-                    TimeoutMilliseconds: 1100
+                    Version: 1
+                    TimeoutMilliseconds: 1000
+                    ResponseAwaitBehaviour: OnAfterCommand
+              robot-multiple-commands-in-one:
+                value:
+                - Target: Robot-1
+                  AutomationCommands:
+                  - Command: PRESS 1; PRESS 2;
+                    Version: 1
+                    TimeoutMilliseconds: 1000
+                    ResponseAwaitBehaviour: OnAfterCommand
+              robot-multiple-commands-seperate:
+                value:
+                - Target: Robot-1
+                  AutomationCommands:
+                  - Command: PRESS 1
+                    Version: 1
+                    TimeoutMilliseconds: 1000
                     ResponseAwaitBehaviour: OnAfterCommand
                   - Command: PRESS 2
-                    Version: 1.2
-                    TimeoutMilliseconds: 1200
+                    Version: 1
+                    TimeoutMilliseconds: 1000
                     ResponseAwaitBehaviour: OnAfterCommand
+              single-command-multiple-extensions:
+                value:
+                - Target: Robot-1
+                  AutomationCommands:
+                  - Command: HOME
+                    Version: 1
+                - Target: Mux-1
+                  AutomationCommands:
+                  - Command: DISABLE
+                    Version: text.v1
+              multiplle-commands-multiple-extensions:
+                value:
+                - Target: Robot-1
+                  AutomationCommands:
+                  - Command: INSERT
+                    Version: 1
+                  - Command: EJECT
+                    Version: 1
+                - Target: Mux-1
+                  AutomationCommands:
+                  - Command: DISABLE
+                    Version: text.v1
+                  - Command: SELECT PORT 1
+                    Version: text.v1
         required: true
         x-position: 1
       responses:
