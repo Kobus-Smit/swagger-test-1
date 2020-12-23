@@ -234,34 +234,7 @@ components:
         - Number
         - 'True'
         - 'False'
-        - 'Null'
-    Dog:
-      description: A representation of a dog
-      allOf:
-        - $ref: '#/components/schemas/ExecuteRequest'
-        - type: object
-          properties:
-            packSize:
-              type: integer
-              format: int32
-              description: The size of the pack the dog is from
-              default: 1
-              minimum: 1
-          required:
-            - packSize
-    HoneyBee:
-      description: A representation of a honey bee
-      allOf:
-        - $ref: '#/components/schemas/ExecuteRequest'
-        - type: object
-          properties:
-            honeyPerDay:
-              type: number
-              description: Average amount of honey produced per day in ounces
-              example: 3.14
-              multipleOf: .01
-          required:
-            - honeyPerDay
+        - 'Null'    
     ExecuteRequest:
       type: object
       additionalProperties: false
@@ -270,9 +243,6 @@ components:
         - AutomationCommands
       discriminator:
         propertyName: Target
-        mapping:
-          robot_simple: '#/components/schemas/HoneyBee'
-          robot_multiple: '#/components/schemas/Dog'
       properties:
         Target:
           type: string
