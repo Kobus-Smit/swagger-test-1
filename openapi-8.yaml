@@ -114,15 +114,24 @@ paths:
             examples:
               test1:
                 value:
-                - Target: string
+                - Target: Robot-1
                   AutomationCommands:
-                  - Command:
-                      ValueKind: Undefined
-                    Version: string
-                    TimeoutMilliseconds: 0
+                  - Command: PRESS 1; PRESS 2; PRESS OK;
+                    Version: 1
+                    TimeoutMilliseconds: 1000
                     ResponseAwaitBehaviour: OnAfterCommand
               test2:
-                value: "test2_val"
+                value:
+                - Target: Robot-1
+                  AutomationCommands:
+                  - Command: PRESS 1
+                    Version: 1.1
+                    TimeoutMilliseconds: 1100
+                    ResponseAwaitBehaviour: OnAfterCommand
+                  - Command: PRESS 2
+                    Version: 1.2
+                    TimeoutMilliseconds: 1200
+                    ResponseAwaitBehaviour: OnAfterCommand
         required: true
         x-position: 1
       responses:
