@@ -111,6 +111,11 @@ paths:
               type: array
               items:
                 $ref: '#/components/schemas/ExecuteRequest'
+            examples:
+              test1:
+                value: "test1_val"
+              test2:
+                value: "test2_val"
         required: true
         x-position: 1
       responses:
