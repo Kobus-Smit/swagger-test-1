@@ -1,0 +1,857 @@
+{
+  "x-generator": "NSwag v13.10.1.0 (NJsonSchema v10.3.3.0 (Newtonsoft.Json v12.0.0.0))",
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Abrantix Extension API",
+    "description": "# General Information\r\n> Date Last Modified: 18.01.21</br>\r\n\r\n## Overview\r\nAbrantix Extensions REST API is a flexible and extensible REST API that allows its users to integrate with Abrantix test tools to run their test(s) or test suits.\r\nThe Extensions REST API provides extensibility through so-called extensions. Abrantix provides extensions for Abrantix Test Tools off-the-shelve, or users can write their own extensions as needed. Such extensions could for example parse and validate terminal log files, or integrate with a host simulator to validate transaction results.\r\nThe Extension REST API then servers as a single API for all extensions.\r\nThe extensions provided by Abrantix or newly created by users can be easily added or removed through the configuration of Extensions REST API.\r\nFollowing are the few examples of the extensions provided by Abrantix:\r\n- Abrantix Robot \r\n- Abrantix Card Multiplexer\r\n- Abrantix Contactless Multiplexer\r\n- Abrantix Magstripe/Chip Card Probe\r\n\r\n### Usage of Extensions REST API\r\nAbrantix Extensions REST API can be used with Enterprise Integrations, where there is a Test Tool(s) that is already in place for the test execution and orchestration. Few of the prominent features as follows:\r\n- Extensions REST API is flexible and supported by many test tools off-the-shelve provided by Abrantix.\r\n- Extensions REST API provides a high degree of flexibility by providing a range of methods, so that users can write requests for test initialization, execution of steps, test cleanup or for the execution of single command or even whole test cases in a single request. \r\n\r\n### Typical Integrations\r\nExtensions REST API can be integrated in the following scenarios:\r\n- Enterprise integration, where there a test system is already in place, for example Eggplant, Tricentis, Micro Focus, Test Complete, Jira or similar\r\n- Single API is desired, instead of calling each Abrantix Test Tool on its own API. This way, users get access to all Abrantix components through a single API.\r\n- Users want to access Abrantix off-the-shelf extensions like OCR.\r\n- Users want to integrated their own extensions implemented by them.\r\n\r\n![Typical Integration Image](../Content/ExtensionRestApi-TypicalIntegration.jpg)\r\n\r\n### Versions\r\nAbrantix Extensions REST API is a versioned API and changes or enhancements are usually backwards compatible. \r\nIn case of any breaking changes, a new version is provided to the users. \r\nThis way, users have full support for the current version and have a choice to migrate to newer versions over the period of time.\r\n\r\n#### PEAapi compatibility\r\nThe Extension REST API version 1 (V1) provides backwards compatibility to its predecessor, the Abrantix PEAapi.\r\nFor new users, it is recommended to use the latest available version.\r\n\r\n### Logging\r\nExtensions REST API uses a flexible logging infrastructure. By default, the following log targets are configured (s. [Configure LoggingNlog.config](#Nlog-config)):\r\n- **Log to a file**\r\nExtensions REST API writes log to a file that can be easily configured for the rules to write in the file, level of logging and where to write to keep the log file, name of log file etc.\r\n- **Console**\r\nExtension REST API will log to the console.\r\n\r\n## Conceptional Overview\r\n### What are Extensions?\r\nExtensions extend the functionality of Extensions REST API. This can be to integrate with Abrantix Test Tools or any other hardware, or some software functionality like validating some log file.\r\nAbrantix provides natively supported extension for Abrantix Test Tools. However, users can write their own extensions to extend the functionality as needed or to interact with external hardware.\r\nExtensions are configured through an Xml file (environment.xml) that represents an environment containing the definition for a collection of individual extensions. \r\nThe environment Xml file contains information such as binary names and configuration settings for each extension).\r\n\r\n### Single API for multiple Extensions\r\nWhile providing a single API for multiple extension, the Extension REST API must ensure that each extension can implement the functionality it needs. This is ensured by allowing each extension to define its own, proprietary command set.\r\nConsider the following figure:\r\n\r\n![Extension Commands](../Content/ExtensionRestApi-ExtensionCommands.jpg)\r\n\r\nIn this case, a REST request contains two instructions, one for a contact multiplexer (`Select Card 1`), one for a robot (`Insert Card`). These instructions are called `commands` and are processed by the corresponding extensions. \r\nThe format and contract for these commands are defined by the provider of the extension and can be freely defined (e.g. JSON, XML, CSV).\r\nThe Extension REST API manages the extensions and orchestrates incoming requests. To do this, the Extension REST API defines a contract that each extension has to adhere to and ensure that this contract is upheld at any time. \r\nThis contract defines how proprietary commands are wrapped into a common format and how the lifetime of extensions is managed.\r\n\r\n### Test Phases and Extension Behavior\r\nSome extensions might require initialization or cleanup at multiple stages in their lifetime.\r\nFor example, the Abrantix OCR extension is optimized for speed and therefore continuously takes pictures in the background. When text recognition is required, this is done on the latest image and no new image has to be taken. This means that the Abrantix OCR extension has to start taking pictures at some stage, and also eventually has to stop doing this.\r\nWhen considering this in the context of a test run, the OCR extension could take pictures all the time during the test run, or the picture taking could start and end with each individual test case and therefore preserve system resources.\r\nAnother example is the Abrantix EFT/POS Terminal Testing Robot. After finishing a test run and until running the next test run, it is best to turn off the robot motors.\r\nTo facilitate such behavior, the Extension REST API provides the following, conceptional execution phases, which are also available as API methods:\r\n- **TestInitialize**\r\nIntended to be called at the beginning of a test case. Extensions who support this will run initialization tasks here. For example, the OCR extension can be configured to start taking pictures here.\r\n- ExecuteSteps\r\nCalled to send commands to extensions, therefore to perform individual test steps.\r\n- **TestCleanup**\r\nIntended to be called at the end of a test case. Extensions who support this will cleanup here. For example, the OCR extension can be configured to stop taking pictures here, or the robot extension can be configured to turn the robot motors off here.\r\n\r\nFor simpler uses cases, the Extension REST API also provide the following method, which combines all execution phases:\r\n- **ExecuteTest**\r\nThis will run through all execution phases mentioned above and can therefore be used to implement a whole test case.\r\nFor the sake of simplicity, this method could also be used to just send single commands to extensions in cases where users do not want to take care of the above mentioned phases within their test scripts.\r\n\r\n### Execute Request Format\r\nFor execute requests (ExecuteSteps, ExecuteTest), the Extension REST API expects JSON payload in the REST for API requests. \r\nEach execute request can contain an individual number of commands for one or more extensions:\r\n- Single command for a single extension\r\n- Multiple command for a single extension\r\n- Single or multiple commands for multiple extension\r\n\r\n#### Response\r\nExtension REST API returns its response in hierarchical manner similar to the requests it receives. On the top level is the overall status of the response which is followed by the detailed results for each individual command.\r\nPlease refer to the Examples below in the section [ExtensionApiV2](#ExtensionApiV2) to see the response structure.\r\n\r\n##### http Status Codes\r\nIn general, the Extension REST API returns the following http status codes:\r\n\r\n| Status Code | Response Message                         |\r\n|------------------|------------------------------------------|\r\n| 200              | OK - This status code means no exception occurred during the processing of the request. However, users still need to parse the response to assess whether the individual commands succeeded or failed. |\r\n| Other States     | Any other status code means that processing failed with an exception. Users can parse the response to assess the exception if present. |\r\n\r\n\r\n### Extension Command Versioning\r\nEvery extension can define its own, proprietary versioning of its commands and configuration.\r\nWhen loading an extension configuration, or when sending a command to an extension, Extension REST API will pass the relevant version to the extension, which can then handle different versions of the payload.\r\nThis approach enables users with following:\r\n- Helps to maintain support to the existing functionality.\r\n- Enables Extensions to provide flexibility to add new command versions to extend support for new command formats or add new features for existing formats as required.\r\n- Handle any breaking changes in case any mandatory setting is introduced to existing feature or while providing new functionality.\r\n\r\nFor example, Card Multiplexer Extension implements commands for the following versions:\r\n- Text.v1\r\n- Json.v1\r\n- Xml.v1\r\n\r\nWhich means Card Multiplexer Extension gives the end user a wider choice to write commands as per their comfort. \r\nIf user A is comfortable to write the test in json then user can use `json.v1`, on the other hand User B is more acquainted with xml then user B can write command in xml format and mention `xml.v1` as version.\r\n\r\n### Extension Behavior Management\r\nAs mentioned in [Execution Phases and Extension Behavior](#Test-Phases-and-Extension-Behavior), there are different phases during a test that are taken into consideration by the Extension REST API.\r\nFrom a user perspective, we distinguish between two options to manage these phases:\r\n- [Behavior Managed by User](#Behavior-Managed-by-User)\r\n- [Behavior Managed by Extension REST API](#Behavior-Managed-by-Extension-REST-API)\r\n\r\nThe following chapters describe this in more detail.\r\n\r\n#### Behavior Managed by User\r\nIn this option, the user manages when a test case starts and ends and at what time a test step is called. This options therefore gives the user more control on the extension behavior while running tests.\r\nThe user will be responsible for the following:\r\n- **At the beginning of a test, call TestInitialize.**\r\nExtension REST API will then initialize the extension(s). \r\n- **Send command by calling ExecuteSteps**\r\nExtension REST API will run all commands for the specified extension(s).\r\n- **At the end of a test, call TestCleanup**\r\nExtension REST API will ensure the involved extension(s) will clean up. If your scripts have catch and finally handlers, ensure to add this call there.\r\nExtension REST API will ensure that this pattern is always adhered to. Calls will fail if a user calls ExecuteSteps or TestCleanup without calling TestInitialize beforehand.\r\nThis is the preferred option if you use a sophisticated test setup and want to have full control over behavior.\r\n\r\n#### Behavior Managed by Extension REST API\r\nIn this option, Extension REST API controls when extensions initialize and clean up.\r\nThis reliefs the user of the burden to call TestInitialize and TestCleanup. The user can simply call ExecuteTest and Extensions REST API will first initialize the extensions, then execute all commands and finally cleanup the extensions. \r\nThis is the preferred option if you want to make simple calls quickly, for example for a proof of concept, or if you have complete test cases that can be executed in a single call to the Extension REST API.\r\n\r\n### Natively Supported Extensions\r\nAbrantix already provides a number of natively supported extensions. You can find more information about these further below.\r\n\r\n# Configuration\r\n## Application Configuration\r\nThe appsettings.json file holds the settings related to the Extension REST API. Following are the main settings that can be configured:\r\n- **SupportedApiVersions**\r\nThis setting is responsible for running the Extension Rest API in V1 and V2 versions. Following are the supported values:\r\n    - 1 \r\nSetting this value will run Extensions REST API in [V1](#Versions). E.g. \"SupportedApiVersions\": [\"1\"]\r\n    - 2\r\nSetting this value will run Extensions Rest API in [V2](#Versions). E.g. \"SupportedApiVersions\": [\"2\"]. This is the recommended option for new users.\r\n\r\n- **Url**\r\nThis setting can be configured to set the Url and Port where the Extension REST API will run. For e.g. \"Url\": \"http://localhost:8000\"\r\n- **Logging**\r\nThis setting can be configured to set the log levels so that Extension REST API can perform logging on these set values.\r\n-   Default \r\nThis is the default level for logging for Extension REST API. User can set this level to Debug, Information, Warning, Error depending on the requirement or details needed.\r\n-   Microsoft\r\nThis is responsible for logging for Microsoft components.  User can set this level to Debug, Information, Warning, Error depending on the requirement or details needed.\r\n-   Microsoft.Hosting.Lifetime\r\n-   This is responsible for logging for Microsoft.Hosting.Lifetime components.  User can set this level to Debug, Information, Warning, Error depending on the requirement or details needed.\r\n-   LogLevel Information\r\n\r\n| Level       | Description |\r\n|-------------|-------------|\r\n| DEBUG       | A detailed output displaying the slightest details. Used mainly for debugging.   |\r\n| INFORMATION | An output of normal processes. This level does not imply that there were any problems during code execution.  |\r\n| WARNING | Output of a slight malfunction. The current operation might be interrupted; however, the layer shall work further.|\r\n| ERROR | The Error log implies a bigger issue in the process. It could be that a robot is not reachable, json provided could not be parsed and similar. The layer should however still work and receive process further requests. |\r\n| CRITICAL | This message defines a fatal behavior. The layer will stop. |\r\n\r\nFor example, please refer to the example in [Appsettings.json](#Appsettings-json).\r\n\r\n## Extensions Configuration\r\nThe environment.xml holds the configuration settings for the extensions. All the desired extensions must be configured in this file.\r\nFor configuring an extension following settings will be required:\r\n- Id – This attribute value is required to identify the extension and same value should be referred in [target](#Extension-Command-Versioning) while making any API calls.\r\n- Path – This attribute value is required and hold the absolute or relative folder path where extension dll is present.\r\n- Assembly – This attribute is required and holds the name of the extension assembly dll.\r\n- Class - This attribute is required and holds the name of the Extension implementation class.\r\n- Configuration- This section holds the configuration setting for the specific extension if any.\r\n\r\nBasic Environment.xml structure as follows:\r\n```Xml\r\n<?xml version=\"1.0\" encoding=\"utf-8\" ?>\r\n<extensionEnvironment version=\"1\">\r\n<extension id=\"extension1-Id\" path=\"relative or absolute path for extension1 assembly folder\" assembly=\"extension1 dll name\" class=\"name of the extension1 class\">\r\n\t\t<configuration version =\"versionNumber\">\r\n\t\t\t<setting1>value1</ setting1>\r\n\t\t\t<setting2>value2</ setting2>\r\n\t\t</configuration>\r\n\t</extension>\r\n\r\n<Extension 2 configuration>\r\n</extensionEnvironment>\r\n```\r\nFor example, please refer to the example in [Environment.xml](#Environment-xml).\r\n\r\n## Configure Logging\r\nExtensions REST API writes log to a file that can be easily configured from Nlog.config file. This file holds settings for following:\r\n- Filename\r\nThis setting allows user to provide location of the file along with name or name format. For e.g. \r\nfilename=`\"C:\\Abrantix Test Environment Extension Rest API Service\\Logs\\${shortdate}.log\"`\r\n\r\n- File Layout\r\nThis setting allows user to provide the layout details for the log file. User can change this setting to any layout format for better readability. For e.g. layout=`\"${longdate}|${logger}|${uppercase:${level}}|${message} {exception:format=ToString}\"`\r\n- Rules\r\nUnder this section of the file user can define the rules for writing the file. For e.g.\r\n```Xml\r\n<rules>\r\n\t<logger name=\"*\" minLevel=\"Trace\" writeTo=\"extensionApiLogFile\"/>\r\n</rules>\r\n```\r\nFor example, please refer to the example in [Nlog.config_](#Nlog-config)[Appsettings.json_1](#Appsettings-json).\r\n\r\n## Configuration File Examples\r\n### Appsettings.json\r\nA sample appsettings.json will look as shown below:\r\n```Json\r\n{\r\n  \"Logging\": {\r\n    \"LogLevel\": {\r\n      \"Default\": \"Information\",\r\n      \"Microsoft\": \"Warning\",\r\n      \"Microsoft.Hosting.Lifetime\": \"Information\"\r\n    }\r\n  },\r\n  \"Kestrel\": {\r\n    \"Endpoints\": {\r\n      \"Http\": {\r\n        \"Url\": \"http://localhost:8000\"\r\n      }\r\n    }\r\n  },\r\n  \"AllowedHosts\": \"*\",\r\n  \"ExtensionsConfigFile\": \"Config\\\\environment.xml\",\r\n  \"SupportedApiVersions\": [\"2\"]\r\n}\r\n```\r\n### Environment.xml\r\nA sample Environment.xml will look as shown below:\r\n```Xml\r\n<?xml version=\"1.0\" encoding=\"utf-8\" ?>\r\n<extensionEnvironment version=\"1\">\r\n\r\n\t<extension id=\"Robot-1\" path=\"..\\..\\Abrantix.TestEnvironment.Adapter.PinEntryMachine-2.0.0+Dev\\bin\" assembly=\"Abrantix.TestEnvironment.Extension.Robot.RobotExtension.dll\" class=\"Abrantix.TestEnvironment.Extension.Robot.Extension.RobotExtension\">\r\n\t\t<configuration version =\"xml.v1\">\r\n\t\t\t<ip>127.0.0.1</ip>\r\n\t\t\t<port>23</port>\r\n\t\t\t<layoutPath>..\\..\\Abrantix.TestEnvironment.Adapter.PinEntryMachine-2.0.0+Dev\\bin\\TerminalSettings</layoutPath>\r\n\t\t\t<keyPressDelay>1200</keyPressDelay>\r\n\t\t\t<terminalType>Yomani</terminalType>\r\n\t\t\t<cardArmMotorOffOnTestCleanup>true</cardArmMotorOffOnTestCleanup>\r\n\t\t\t<fingerHomeOnTestCleanup>true</fingerHomeOnTestCleanup>\r\n\t\t\t<removeCardOnTestCleanup>true</removeCardOnTestCleanup>\r\n\t\t</configuration>\r\n\t</extension>\r\n\r\n\t<extension id=\"Mux-1\" path=\"..\\..\\Abrantix.TestEnvironment.Adapter.AxCardMux-2.0.0+Dev\\bin\" assembly=\"Abrantix.TestEnvironment.Extension.AxCardMuxExtension.dll\" class=\"Abrantix.TestEnvironment.Extension.AxCardMuxExtension.AxCardMuxExtension\">\r\n\t\t<configuration version =\"xml.v1\">\r\n\t\t\t<Mac>1407E000061D</Mac>\r\n\t\t\t<LayoutPath>..\\..\\Abrantix.TestEnvironment.Adapter.AxCardMux-2.0.0+Dev\\bin\\CardConfigurations\\DefaultCardConfiguration.xml</LayoutPath>\r\n\t\t</configuration>\r\n\t</extension>\r\n\r\n\t<extension id=\"CtlMux-1\" path=\"..\\..\\Abrantix.TestEnvironment.Adapter.AxCtlMux-1.0.1+Dev\\bin\" assembly=\"Abrantix.TestEnvironment.Extension.AxCtlMuxExtension.dll\" class=\"Abrantix.TestEnvironment.Extension.AxCtlMuxExtension.Extension.AxCtlMuxExtension\">\r\n\t\t<configuration version =\"xml.v1\">\r\n\t\t\t<mac>1407E000068E</mac>\r\n\t\t\t<layoutPath>..\\..\\Abrantix.TestEnvironment.Adapter.AxCtlMux-1.0.1+Dev\\bin\\CardConfigurations\\DefaultCardConfiguration.xml</layoutPath>\r\n\t\t</configuration>\r\n\t</extension>\r\n\r\n</extensionEnvironment>\r\n```\r\n\r\n### Nlog.config\r\nA sample nlog.config will look as shown below:\r\n```Nlog\r\n<?xml version=\"1.0\" encoding=\"utf-8\" ?>\r\n<nlog xmlns=\"http://www.nlog-project.org/schemas/NLog.xsd\"\r\n        xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\"\r\n        autoReload=\"true\">\r\n\t\r\n\t<!--Target to write to-->\r\n\t<targets>\r\n\t\t<target name=\"extensionApiLogFile\" xsi:type=\"File\" filename=\"C:\\Abrantix Test Environment Extension Rest API Service\\Logs\\${shortdate}.log\"\r\n\t\t\t\tlayout=\"${longdate}|${logger}|${uppercase:${level}}|${message} ${exception:format=ToString}\" />\r\n\t</targets>\r\n\t\r\n\t<!--Rules to map from logger name to target-->\r\n\t<rules>\r\n\t\t<logger name=\"*\" minLevel=\"Trace\" writeTo=\"extensionApiLogFile\"/>\r\n\t</rules>\r\n</nlog>\r\n```\r\n\r\n\r\n",
+    "contact": {
+      "name": "Abrantix Ltd",
+      "url": "https://www.abrantix.com",
+      "email": "martin.gloor@abrantix.com"
+    },
+    "license": {
+      "name": "License",
+      "url": "https://www.abrantix.com/license"
+    },
+    "version": "v2",
+    "x-logo": {
+      "url": "..\\Content\\AbrantixLogo.svg",
+      "altText": "AbrantixLogo",
+      "href": "..\\api-doc"
+    }
+  },
+  "paths": {
+    "/ExtensionApi/V2": {
+      "get": {
+        "tags": [
+          "ExtensionApiV2"
+        ],
+        "summary": "Get extensions IDs",
+        "operationId": "ExtensionApiV2_Get",
+        "responses": {
+          "200": {
+            "description": "`StatusResponse` containing IDs of the active extensions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatusResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ExtensionApi/V2/TestInitialize": {
+      "post": {
+        "tags": [
+          "ExtensionApiV2"
+        ],
+        "summary": "Initialize Test",
+        "description": "* Intended to be called at the beginning of a test case.\n* Extensions who support this will run initialization tasks here.\n* For example, the OCR extension can be configured to start taking pictures here\n* Only use this method if you want to control the test lifetime in conjunction with `ExecuteSteps` and `TestCleanup`. Otherwise use `ExecuteTest`",
+        "operationId": "ExtensionApiV2_TestInitialize",
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/ExtensionApi/V2/ExecuteSingleStep": {
+      "post": {
+        "tags": [
+          "ExtensionApiV2"
+        ],
+        "summary": "Execute single test step",
+        "description": "* Called to send commands to extensions, therefore to perform an individual test step, on an initialized test environment.\n* Only use this method if you want to control the test lifetime in conjunction with `TestInitialize` and `TestCleanup`. Otherwise use `ExecuteTest`\n ",
+        "operationId": "ExtensionApiV2_ExecuteSingleStep",
+        "requestBody": {
+          "x-name": "executeRequest",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SingleExecuteRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SingleExecuteResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ExtensionApi/V2/ExecuteSteps": {
+      "post": {
+        "tags": [
+          "ExtensionApiV2"
+        ],
+        "summary": "Execute test steps",
+        "description": "* Called to send commands to extensions, therefore to perform test steps, on an initialized test environment.\n* Only use this method if you want to control the test lifetime in conjunction with `TestInitialize` and `TestCleanup`. Otherwise use `ExecuteTest`\n\n ",
+        "operationId": "ExtensionApiV2_ExecuteSteps",
+        "requestBody": {
+          "x-name": "executeRequests",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ExecuteRequest"
+                }
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExecuteResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ExtensionApi/V2/TestCleanup": {
+      "post": {
+        "tags": [
+          "ExtensionApiV2"
+        ],
+        "summary": "Clean up test\n ",
+        "description": "* Intended to be called at the end of a test case.\n* Extensions who support this will cleanup here.\n* For example, the OCR extension can be configured to stop taking pictures here, or the robot extension can be configured to turn the robot motors off here.\n* Only use this method if you want to control the test lifetime in conjunction with `TestInitialize` and `ExecuteSteps`. Otherwise use `ExecuteTest`",
+        "operationId": "ExtensionApiV2_TestCleanup",
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        }
+      }
+    },
+    "/ExtensionApi/V2/ExecuteSingleTest": {
+      "post": {
+        "tags": [
+          "ExtensionApiV2"
+        ],
+        "summary": "Execute single test",
+        "description": "* Executes all commands received on the targeted extensions\n* This method handles the test lifetime for you, if you want more control use `TestInitialize`, `ExecuteSteps`, `TestCleanup` instead",
+        "operationId": "ExtensionApiV2_ExecuteSingleTest",
+        "requestBody": {
+          "x-name": "executeRequest",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SingleExecuteRequest"
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SingleExecuteResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ExtensionApi/V2/ExecuteTest": {
+      "post": {
+        "tags": [
+          "ExtensionApiV2"
+        ],
+        "summary": "Execute tests",
+        "description": "* This will run through all execution phases mentioned above and can therefore be used to implement a whole test case.\n* For the sake of simplicity, this method could also be used to just send single commands to extensions in cases where users do not want to take care of the above mentioned phases within their test scripts\n* This method handles the test lifetime for you, if you want more control use `TestInitialize`, `ExecuteSteps`, `TestCleanup` instead\n* The response is returned in hierarchical manner similar to the requests it receives.\n* On the top level is the overall status of the response which is followed by the detailed results for each individual command.",
+        "operationId": "ExtensionApiV2_ExecuteTest",
+        "requestBody": {
+          "x-name": "executeRequests",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ExecuteRequest"
+                }
+              }
+            }
+          },
+          "required": true,
+          "x-position": 1
+        },
+        "responses": {
+          "200": {
+            "description": "The `ExecuteResponse`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExecuteResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "StatusResponse": {
+        "type": "object",
+        "description": "IDs of the active extensions",
+        "example": {
+          "id": [
+            "Robot-1",
+            "Mux-1",
+            "CtlMux-1"
+          ]
+        },
+        "additionalProperties": false,
+        "properties": {
+          "Id": {
+            "type": "array",
+            "description": "IDs of the active extensions",
+            "nullable": true,
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "SingleExecuteResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "Result": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/TestResult"
+              }
+            ]
+          },
+          "AutomationResult": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/AutomationResult"
+              }
+            ]
+          }
+        }
+      },
+      "TestResult": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Enumeration"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false
+          }
+        ]
+      },
+      "Enumeration": {
+        "type": "object",
+        "x-abstract": true,
+        "additionalProperties": false,
+        "properties": {
+          "Name": {
+            "type": "string",
+            "nullable": true
+          },
+          "Code": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "AutomationResult": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "TestResult": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/TestResult"
+              }
+            ]
+          },
+          "Command": {
+            "$ref": "#/components/schemas/JsonElement"
+          },
+          "Target": {
+            "type": "string",
+            "nullable": true
+          },
+          "Payload": {
+            "$ref": "#/components/schemas/JsonElement"
+          },
+          "SubAutomationResults": {
+            "type": "array",
+            "nullable": true,
+            "items": {
+              "$ref": "#/components/schemas/AutomationResult"
+            }
+          }
+        }
+      },
+      "JsonElement": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "ValueKind": {
+            "$ref": "#/components/schemas/JsonValueKind"
+          }
+        }
+      },
+      "JsonValueKind": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Undefined",
+          "Object",
+          "Array",
+          "String",
+          "Number",
+          "True",
+          "False",
+          "Null"
+        ],
+        "enum": [
+          "Undefined",
+          "Object",
+          "Array",
+          "String",
+          "Number",
+          "True",
+          "False",
+          "Null"
+        ]
+      },
+      "SingleExecuteRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "Target",
+          "AutomationCommand"
+        ],
+        "properties": {
+          "Target": {
+            "type": "string",
+            "description": "Automation target of the following automationCommands",
+            "minLength": 1,
+            "example": "robot"
+          },
+          "AutomationCommand": {
+            "$ref": "#/components/schemas/AutomationCommand"
+          }
+        }
+      },
+      "AutomationCommand": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "Command"
+        ],
+        "properties": {
+          "Command": {
+            "description": "Command for this automation target. For command syntax check documentation of the used extension.",
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/JsonElement"
+              }
+            ]
+          },
+          "Version": {
+            "type": "string",
+            "description": "version of the command.",
+            "nullable": true
+          },
+          "TimeoutMilliseconds": {
+            "type": "integer",
+            "description": "Optional: provide a timeout in milliseconds for the command to abort.",
+            "format": "int32",
+            "nullable": true
+          },
+          "ResponseAwaitBehaviour": {
+            "description": "Response Await behaviour per command",
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ResponseAwaitBehaviour"
+              }
+            ]
+          },
+          "DelayBefore": {
+            "type": "integer",
+            "description": "Delay before the execution in milliseconds",
+            "format": "int32",
+            "nullable": true
+          },
+          "DelayAfter": {
+            "type": "integer",
+            "description": "Delay before the execution in milliseconds",
+            "format": "int32",
+            "nullable": true
+          }
+        }
+      },
+      "ResponseAwaitBehaviour": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "OnAfterCommand",
+          "OnRequestEnd"
+        ],
+        "enum": [
+          "OnAfterCommand",
+          "OnRequestEnd"
+        ]
+      },
+      "ExecuteResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "Result": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/TestResult"
+              }
+            ]
+          },
+          "AutomationResults": {
+            "type": "array",
+            "nullable": true,
+            "items": {
+              "$ref": "#/components/schemas/AutomationResult"
+            }
+          }
+        }
+      },
+      "ExecuteRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "Target",
+          "AutomationCommands"
+        ],
+        "properties": {
+          "Target": {
+            "type": "string",
+            "description": "Automation target of the following automationCommands",
+            "minLength": 1
+          },
+          "AutomationCommands": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AutomationCommand"
+            }
+          }
+        }
+      },
+      "RobotCommand": {
+        "type": "object",
+        "description": "TODO: Add summary of the RobotCommand POCO",
+        "example": {
+          "TODO": "Add example"
+        },
+        "additionalProperties": false,
+        "properties": {
+          "RawCommand": {
+            "type": "string",
+            "nullable": true
+          },
+          "Commands": {
+            "type": "array",
+            "nullable": true,
+            "items": {
+              "type": "string"
+            }
+          },
+          "ConditionVariable": {
+            "type": "string",
+            "nullable": true
+          },
+          "ConditionValue": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "RobotExtensionConfiguration": {
+        "type": "object",
+        "description": "TODO: Add summary of the RobotExtensionConfiguration POCO",
+        "example": {
+          "extensionEnvironment": {
+            "extension": {
+              "configuration": {
+                "ip": "192.168.0.16",
+                "keyPressDelay": 1000,
+                "terminalType": "Ingenico-IPP350",
+                "removeCardOnDispose": true
+              }
+            }
+          }
+        },
+        "additionalProperties": false,
+        "properties": {
+          "AllMotorsOffOnTestCleanup": {
+            "type": "boolean"
+          },
+          "CardArmMotorOffOnTestCleanup": {
+            "type": "boolean"
+          },
+          "CardArmMotorOffOnDispose": {
+            "type": "boolean"
+          },
+          "EvaluateResponseForRobotSendCommand": {
+            "type": "boolean"
+          },
+          "FingerHomeOnTestCleanup": {
+            "type": "boolean"
+          },
+          "FingerHomeOnDispose": {
+            "type": "boolean"
+          },
+          "ResetAndHomeOnTestInitialize": {
+            "type": "boolean"
+          },
+          "Ip": {
+            "type": "string",
+            "description": "The IP Address of the Robot",
+            "nullable": true
+          },
+          "KeyPressDelay": {
+            "type": "string",
+            "nullable": true
+          },
+          "LayoutPath": {
+            "type": "string",
+            "nullable": true
+          },
+          "MacAddress": {
+            "type": "string",
+            "nullable": true
+          },
+          "Port": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "RemoveCardOnTestCleanup": {
+            "type": "boolean"
+          },
+          "RemoveCardOnDispose": {
+            "type": "boolean"
+          },
+          "TerminalType": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "AxMagstripeProbeConfiguration": {
+        "type": "object",
+        "description": "TODO: Add summary of the AxMagstripeProbeConfiguration POCO",
+        "example": {
+          "extensionEnvironment": {
+            "extension": {
+              "configuration": {
+                "mac": "1407E000063E"
+              }
+            }
+          }
+        },
+        "additionalProperties": false,
+        "properties": {
+          "Mac": {
+            "type": "string",
+            "nullable": true
+          },
+          "Ip": {
+            "type": "string",
+            "nullable": true
+          },
+          "LayoutPath": {
+            "type": "string",
+            "nullable": true
+          },
+          "LocalUdpPort": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "MacAddress": {
+            "type": "string",
+            "format": "byte",
+            "nullable": true
+          },
+          "IpAddress": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/IPAddress"
+              }
+            ]
+          }
+        }
+      },
+      "IPAddress": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "AddressFamily": {
+            "$ref": "#/components/schemas/AddressFamily"
+          },
+          "ScopeId": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "IsIPv6Multicast": {
+            "type": "boolean"
+          },
+          "IsIPv6LinkLocal": {
+            "type": "boolean"
+          },
+          "IsIPv6SiteLocal": {
+            "type": "boolean"
+          },
+          "IsIPv6Teredo": {
+            "type": "boolean"
+          },
+          "IsIPv4MappedToIPv6": {
+            "type": "boolean"
+          },
+          "Address": {
+            "type": "integer",
+            "format": "int64",
+            "deprecated": true,
+            "x-deprecatedMessage": "This property has been deprecated. It is address family dependent. Please use IPAddress.Equals method to perform comparisons. https://go.microsoft.com/fwlink/?linkid=14202"
+          }
+        }
+      },
+      "AddressFamily": {
+        "type": "string",
+        "description": "",
+        "x-enumNames": [
+          "Unspecified",
+          "Unix",
+          "InterNetwork",
+          "ImpLink",
+          "Pup",
+          "Chaos",
+          "NS",
+          "Ipx",
+          "Osi",
+          "Iso",
+          "Ecma",
+          "DataKit",
+          "Ccitt",
+          "Sna",
+          "DecNet",
+          "DataLink",
+          "Lat",
+          "HyperChannel",
+          "AppleTalk",
+          "NetBios",
+          "VoiceView",
+          "FireFox",
+          "Banyan",
+          "Atm",
+          "InterNetworkV6",
+          "Cluster",
+          "Ieee12844",
+          "Irda",
+          "NetworkDesigners",
+          "Max",
+          "Packet",
+          "ControllerAreaNetwork",
+          "Unknown"
+        ],
+        "enum": [
+          "Unspecified",
+          "Unix",
+          "InterNetwork",
+          "ImpLink",
+          "Pup",
+          "Chaos",
+          "Ipx",
+          "Ipx",
+          "Iso",
+          "Iso",
+          "Ecma",
+          "DataKit",
+          "Ccitt",
+          "Sna",
+          "DecNet",
+          "DataLink",
+          "Lat",
+          "HyperChannel",
+          "AppleTalk",
+          "NetBios",
+          "VoiceView",
+          "FireFox",
+          "Banyan",
+          "Atm",
+          "InterNetworkV6",
+          "Cluster",
+          "Ieee12844",
+          "Irda",
+          "NetworkDesigners",
+          "Max",
+          "Packet",
+          "ControllerAreaNetwork",
+          "Unknown"
+        ]
+      },
+      "AxCardMuxConfiguration": {
+        "type": "object",
+        "description": "TODO: Add summary of the AxCardMuxConfiguration POCO",
+        "example": {
+          "extensionEnvironment": {
+            "extension": {
+              "configuration": {
+                "mac": "1407E000061D"
+              }
+            }
+          }
+        },
+        "additionalProperties": false,
+        "properties": {
+          "defaultLayoutPath": {
+            "type": "string",
+            "nullable": true
+          },
+          "Mac": {
+            "type": "string",
+            "nullable": true
+          },
+          "Ip": {
+            "type": "string",
+            "nullable": true
+          },
+          "LayoutPath": {
+            "type": "string",
+            "nullable": true
+          },
+          "DoNotDisableCardMuxAfterTest": {
+            "type": "boolean"
+          },
+          "LocalUdpPort": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "AxCtlMuxConfiguration": {
+        "type": "object",
+        "description": "TODO: Add summary of the AxCtlMuxConfiguration POCO",
+        "example": {
+          "extensionEnvironment": {
+            "extension": {
+              "configuration": {
+                "mac": "1407E000068E"
+              }
+            }
+          }
+        },
+        "additionalProperties": false,
+        "properties": {
+          "defaultLayoutPath": {
+            "type": "string",
+            "nullable": true
+          },
+          "Mac": {
+            "type": "string",
+            "nullable": true
+          },
+          "Ip": {
+            "type": "string",
+            "nullable": true
+          },
+          "LayoutPath": {
+            "type": "string",
+            "nullable": true
+          },
+          "LocalUdpPort": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "DoNotDisableCtlMuxAfterTest": {
+            "type": "boolean"
+          }
+        }
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "ExtensionApiV2",
+      "description": "The Extension API is a generic interface simplifying interaction with extensions."
+    },
+    {
+      "name": "Setup Guide",
+      "description": "This section provides details about how to get started with the Extensions REST API. \r\n\r\n## Package Overview\r\nAbrantix Extensions REST API packaged contains the following main folders:\r\n\r\n| File / Folder | Description                              |\r\n|---------------|------------------------------------------|\r\n| bin           | Necessary binaries to run the Extension REST API |\r\n| bin/config    | All configuration files (s. [Configuration](#section/Configuration)) |\r\n| install       | Installation scripts (s. [Execution Options](#Execution-Options)) |\r\n| Doc           | Documentation                            |\r\n| start.bat     | A batch file to run the Extension REST API from a shell |\r\n\r\n## First Steps\r\nRun through this procedure to get the Extension REST API up and running:\r\n1.\tConfiguration\r\nConfigure the Extensions REST API as described in [Configuration](#section/Configuration) section.\r\n2.\tInstall and Execute Extension REST API\r\nInstall Extension REST API as windows Service (s. [Installation as Windows Service](#Installation-as-Window-Service)) or run it directly in a shell (s.  [Using Extensions REST API in a Shell](#Using-Extensions-REST-API-in-a-Shell)).\r\n\r\n## Execution Options\r\n### Installation as Window Service\r\nExtensions REST API can be run as windows service. Following are the steps:\r\n1.\tCopy the unzipped package to the desired location. E.g. ``c:\\Abrantix\\ExtensionsRestAPI``\r\n2.\tMake sure the Extensions REST API is configured as described in [Configuration](#section/Configuration) section.\r\n3.\tStart a PowerShell on `bin/Install`\r\n4.\tRun ServiceInstaller.ps1 and you will be prompted for necessary inputs. After providing the required input Extension REST API will be installed as Windows Service.\r\n5.\tStart the newly installed Windows Service.\r\n\r\n### Using Extensions REST API in a Shell\r\nExtensions REST API can be run directly in a shell. Following are the steps:\r\n1.\tCopy the unzipped package to the desired location. E.g. `c:\\Abrantix\\ExtensionsRestAPI`\r\n2.\tMake sure the Extensions REST API is configured as described in [Configuration](#section/Configuration) section.\r\n3.\tOpen a power shell on the package root folder and run start.bat.\r\n"
+    },
+    {
+      "name": "Robot",
+      "description": "# Robot: General Information\r\n> Date Last Modified: 15.01.2021</br>\r\n\r\n## Introduction\r\nThe Robot Extension is used to communicate and execute commands on the Abrantix EFT/POS Terminal Testing Robot. This section will give a more in depth explanation \r\nof the robot extension and what it comprises of.\r\n\r\n## Robot Extension Configuration\r\nThe robot extension is configured in the environment.xml file of the Extensions API. Please refer to section [Extensions Configuration](#section/Configuration/Extensions-Configuration) for more information.\r\nThe POCO for the Robot Extension configuration settings can be viewed within the ([RobotExtensionConfiguration](#section/Robot:-Classes/RobotExtensionConfiguration)) section.\r\n\r\n### Robot Extension Configuration Example:\r\n```Xml\r\n<?xml version=\"1.0\" encoding=\"utf-8\" ?>\r\n<extensionEnvironment version=\"1\">\r\n\r\n\t<extension id=\"Robot-1\" path=\"..\\..\\Abrantix.Atf.Extensions.Robot\\extension\\netstandard2.0\" assembly=\"Abrantix.Atf.Extensions.Robot.dll\" class=\"Abrantix.Atf.Services.Extensions.Implementations.Robot.RobotExtension\">\r\n\t\t<configuration version =\"xml.v1\">\r\n\t\t\t<ip>192.168.0.16</ip>\r\n\t\t\t<macAddress>14-07-e0-ff-53-12</macAddress>\r\n\t\t\t<port>23</port>\r\n\t\t\t<layoutPath>..\\..\\Abrantix.Atf.Extensions.Robot\\extension\\netstandard2.0\\TerminalSettings</layoutPath>\r\n\t\t\t<keyPressDelay>1200</keyPressDelay>\r\n\t\t\t<terminalType>Ingenico-IPP350</terminalType>\r\n\t\t\t<cardArmMotorOffOnTestCleanup>false</cardArmMotorOffOnTestCleanup>\r\n\t\t\t<cardArmMotorOffOnDispose>true</cardArmMotorOffOnDispose>\r\n\t\t\t<fingerHomeOnTestCleanup>false</fingerHomeOnTestCleanup>\r\n\t\t\t<fingerHomeOnDispose>true</fingerHomeOnDispose>\r\n\t\t\t<removeCardOnTestCleanup>false</removeCardOnTestCleanup>\r\n\t\t\t<removeCardOnDispose>true</removeCardOnDispose>\r\n\t\t</configuration>\r\n\t</extension>\r\n</extensionEnvironment>\r\n```\r\n\r\n## Commands\r\nThe Robot Extension supports a variety of commands that may be used to automate the pressing of Terminal buttons and inserting and ejecting of card probes.\r\n\r\nThe robot extension defines a set of proprietary commands that can be passed with each request as \"raw commands\".\r\n\r\n### Raw Command Example:\r\nBelow is an example of a PIN Entry command. When this command (JSON payload) is sent to the Robot it will press the buttons '1', '2', '3', '4' and 'OK' on the PIN pad of the terminal.\r\n```Json\r\n\"1;2;3;4;OK\"\r\n```\r\n#### Supported Commands\r\n| Command | Action executed                          |\r\n|---------|------------------------------------------|\r\n| 0       | 0 is pressed on payment terminal         |\r\n| 1       | 1 is pressed on payment terminal         |\r\n| 2       | 2 is pressed on payment terminal         |\r\n| 3       | 3 is pressed on payment terminal         |\r\n| 4       | 4 is pressed on payment terminal         |\r\n| 5       | 5 is pressed on payment terminal         |\r\n| 6       | 6 is pressed on payment terminal         |\r\n| 7       | 7 is pressed on payment terminal         |\r\n| 8       | 8 is pressed on payment terminal         |\r\n| 9       | 9 is pressed on payment terminal         |\r\n| Menu    | Menu is pressed on payment terminal      |\r\n| .       | . is pressed on payment terminal         |\r\n| Stop    | Stop is pressed on payment terminal      |\r\n| Corr    | Corr is pressed on payment terminal      |\r\n| Ok      | Ok is pressed on payment terminal        |\r\n| Insert  | Card probe is Inserted into the payment terminal |\r\n| Eject   | Card probe is Ejected from the payment terminal |\r\n| Sleep   | Motors of the card arm are put to sleep  |\r\n| Reset   | Resets all motors on the robot           |\r\n| Home    | Robot moves to home position and card arm inserts and ejects the card probe |\r\n\r\nTable 1: Default Robot Extension Commands\r\n\r\n### Supported Terminals\r\nThe Robot Extension supports a wide range of payment terminals. If your terminal is not listed below, please contact Abrantix. \r\nAdding support for other termminals is usually simple.\r\n\r\n| Terminal Model                     |\r\n|------------------------------------|\r\n| Davinci 2 Pinpad                   |\r\n| Davinci 2 Vending                  |\r\n| ICP                                |\r\n| Ingenico Desk3500                  |\r\n| Ingenico ICT220                    |\r\n| Ingenico ICT250                    |\r\n| Ingenico IPP310                    |\r\n| Ingenico IPP320                    |\r\n| Ingenico IPP350                    |\r\n| Ingenico IUC180B                   |\r\n| Ingenico IWL250                    |\r\n| Ingenico Lane3000                  |\r\n| Ingenico Lane5000                  |\r\n| Ingenico Move5000                  |\r\n| Ingenico Move5000 Makeshift        |\r\n| LiveGroup Verifone Vx675 Makeshift |\r\n| Miura 010                          |\r\n| Miura 020                          |\r\n| Paytec Davinci Vending             |\r\n| Quest QT720                        |\r\n| Valina                             |\r\n| Verifone E280 touch                |\r\n| VeriFone E355                      |\r\n| Verifone M400                      |\r\n| VeriFone MX915.xml                 |\r\n| VeriFone MX925                     |\r\n| Verifone P400                      |\r\n| Verifone V240m                     |\r\n| Verifone V400m                     |\r\n| VeriFone VX820                     |\r\n| Verifone VX825                     |\r\n| Yomani                             |\r\n| Yoximo                             |\r\n\r\nTable 2: Supported Payment Terminal Models\r\n\r\n#### Pressing Custom Locations\r\nA user can define their own custom positions where the robot should press. This is useful in situations where the end user may want to press a button on the screen of the payment terminal.\r\nExamples for this can be accessed via the [client downloads](https://blog.abrantix.com/robot/client-downloads/) page.\r\n\r\n## Connectivity\r\nThe Robot Extension supports the TCP/IP connectivity option of the robot. Please refer to the [Robot Extension Configuration](#) section which shows how to define the robot IP for the Extension. When a command is sent to the robot a connection is established and kept alive for the duration of the command(s) that are being executed. \r\nOnce the command has finished executing, the robot connection is disposed of until another command is executed.\r\n\r\n\r\n# Robot: Classes\r\n\r\n## RobotCommand\r\nTODO: Add summary of the RobotCommand POCO\r\n<SchemaDefinition schemaRef=\"#/components/schemas/RobotCommand\" />\r\n\r\n\r\n\r\n## RobotExtensionConfiguration\r\nTODO: Add summary of the RobotExtensionConfiguration POCO\r\n<SchemaDefinition schemaRef=\"#/components/schemas/RobotExtensionConfiguration\" />\r\n\r\n"
+    },
+    {
+      "name": "MagstripeProbe",
+      "description": "\r\n\r\n# MagstripeProbe: Classes\r\n\r\n## AxMagstripeProbeConfiguration\r\nTODO: Add summary of the AxMagstripeProbeConfiguration POCO\r\n<SchemaDefinition schemaRef=\"#/components/schemas/AxMagstripeProbeConfiguration\" />\r\n\r\n"
+    },
+    {
+      "name": "CardMux",
+      "description": "\r\n\r\n# CardMux: Classes\r\n\r\n## AxCardMuxConfiguration\r\nTODO: Add summary of the AxCardMuxConfiguration POCO\r\n<SchemaDefinition schemaRef=\"#/components/schemas/AxCardMuxConfiguration\" />\r\n\r\n"
+    },
+    {
+      "name": "CtlMux",
+      "description": "\r\n\r\n# CtlMux: Classes\r\n\r\n## AxCtlMuxConfiguration\r\nTODO: Add summary of the AxCtlMuxConfiguration POCO\r\n<SchemaDefinition schemaRef=\"#/components/schemas/AxCtlMuxConfiguration\" />\r\n\r\n"
+    }
+  ],
+  "x-tagGroups": [
+    {
+      "name": "Main API",
+      "tags": [
+        "ExtensionApiV2"
+      ]
+    },
+    {
+      "name": "Extensions",
+      "tags": [
+        "Robot",
+        "MagstripeProbe",
+        "CardMux",
+        "CtlMux"
+      ]
+    },
+    {
+      "name": "Getting Started",
+      "tags": [
+        "Setup Guide"
+      ]
+    }
+  ]
+}
